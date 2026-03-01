@@ -1,12 +1,12 @@
 ; Shared settings used across the script.
 ; Audio feature hotkeys.
 global AUDIO_HOTKEY_MUTE := "^F1"
-global AUDIO_HOTKEY_VOLUME_UP := "^F2"
-global AUDIO_HOTKEY_VOLUME_DOWN := "^F3"
+global AUDIO_HOTKEY_VOLUME_DOWN := "^F2"
+global AUDIO_HOTKEY_VOLUME_UP := "^F3"
 
 ; Brightness feature hotkeys.
-global BRIGHTNESS_HOTKEY_UP := "^F4"
-global BRIGHTNESS_HOTKEY_DOWN := "^F5"
+global BRIGHTNESS_HOTKEY_DOWN := "^F4"
+global BRIGHTNESS_HOTKEY_UP := "^F5"
 
 ; Navigation feature hotkeys.
 global NAVIGATION_HOTKEY_SELECT_END := "+!Right"
