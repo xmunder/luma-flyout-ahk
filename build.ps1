@@ -13,10 +13,15 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ResolvedSource = Join-Path $ProjectRoot $SourcePath
 $DistDir = Join-Path $ProjectRoot "dist"
-$ProjectName = Split-Path $ProjectRoot -Leaf
+
+if (-not (Test-Path -LiteralPath $ResolvedSource)) {
+    throw "No se encontro el script de entrada: $ResolvedSource"
+}
+
+$SourceName = [System.IO.Path]::GetFileNameWithoutExtension($ResolvedSource)
 
 if ([string]::IsNullOrWhiteSpace($OutputName)) {
-    $OutputName = $ProjectName
+    $OutputName = $SourceName
 }
 
 if (-not $OutputName.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -24,10 +29,6 @@ if (-not $OutputName.EndsWith(".exe", [System.StringComparison]::OrdinalIgnoreCa
 }
 
 $ResolvedOutput = Join-Path $DistDir $OutputName
-
-if (-not (Test-Path -LiteralPath $ResolvedSource)) {
-    throw "No se encontro el script de entrada: $ResolvedSource"
-}
 
 if ($Clean -and (Test-Path -LiteralPath $ResolvedOutput)) {
     Remove-Item -LiteralPath $ResolvedOutput -Force
@@ -182,6 +183,25 @@ public static class NativeIcon {
     }
 }
 
+function Wait-ForFile {
+    param(
+        [string]$Path,
+        [int]$TimeoutMs = 2000
+    )
+
+    $elapsedMs = 0
+    while ($elapsedMs -le $TimeoutMs) {
+        if (Test-Path -LiteralPath $Path) {
+            return $true
+        }
+
+        Start-Sleep -Milliseconds 200
+        $elapsedMs += 200
+    }
+
+    return $false
+}
+
 function Resolve-BuildIcon {
     param(
         [string]$PreferredPath,
@@ -254,8 +274,16 @@ if ($exitCode -ne 0) {
     throw "Ahk2Exe devolvio un codigo de salida $exitCode."
 }
 
+if (-not (Wait-ForFile -Path $ResolvedOutput)) {
+    $fallbackOutput = Join-Path (Split-Path -Parent $ResolvedSource) "$SourceName.exe"
+
+    if ((Test-Path -LiteralPath $fallbackOutput) -and ($fallbackOutput -ne $ResolvedOutput)) {
+        Move-Item -LiteralPath $fallbackOutput -Destination $ResolvedOutput -Force
+    }
+}
+
 if (-not (Test-Path -LiteralPath $ResolvedOutput)) {
-    throw "Ahk2Exe no genero el ejecutable esperado: $ResolvedOutput"
+    throw "Ahk2Exe no genero el ejecutable esperado: $ResolvedOutput. Revisa si creo '$SourceName.exe' junto al script o si mostro un error adicional."
 }
 
 Write-Host "Compilacion completada."
