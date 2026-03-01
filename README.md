@@ -28,6 +28,7 @@ OSD de brillo personalizado para Windows en AutoHotkey v2, con control por WMI y
 ## Compilación a EXE
 
 El proyecto incluye `build.ps1` para compilar `main.ahk` con `Ahk2Exe`.
+Para compilar, instala AutoHotkey v2 con el compilador `Ahk2Exe` disponible.
 
 ```powershell
 .\build.ps1
