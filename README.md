@@ -41,6 +41,32 @@ Script modular en AutoHotkey v2 para controlar volumen, brillo, navegación y ut
 
 También puedes ejecutar `shortcuts_v2.ahk`, que carga el mismo script principal.
 
+## Compilación a EXE
+
+El proyecto incluye un script de compilación en PowerShell: `build.ps1`.
+
+Uso básico:
+
+```powershell
+.\build.ps1
+```
+
+Eso compila `main.ahk` y genera el ejecutable en `dist\`.
+
+Opciones útiles:
+
+```powershell
+.\build.ps1 -OutputName "AtajosMSI.exe"
+.\build.ps1 -CompilerPath "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe"
+.\build.ps1 -Clean
+```
+
+Notas:
+
+- Usa `Ahk2Exe.exe`, el compilador incluido con AutoHotkey.
+- Si `Ahk2Exe.exe` no se encuentra automáticamente, puedes indicar la ruta con `-CompilerPath`.
+- El `.exe` generado sigue dependiendo de la lógica actual del script y de las capacidades de Windows/equipo.
+
 ## Atajos por Defecto
 
 Los atajos actuales salen de `src/config.ahk`.
