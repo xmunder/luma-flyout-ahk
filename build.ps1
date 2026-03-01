@@ -246,9 +246,12 @@ if ($ResolvedIcon) {
     $compilerArgs += @("/icon", $ResolvedIcon)
 }
 
-$process = Start-Process -FilePath $ResolvedCompiler -ArgumentList $compilerArgs -Wait -PassThru
-if ($process.ExitCode -ne 0) {
-    throw "Ahk2Exe devolvio un codigo de salida $($process.ExitCode)."
+$global:LASTEXITCODE = 0
+& $ResolvedCompiler @compilerArgs
+$exitCode = $LASTEXITCODE
+
+if ($exitCode -ne 0) {
+    throw "Ahk2Exe devolvio un codigo de salida $exitCode."
 }
 
 if (-not (Test-Path -LiteralPath $ResolvedOutput)) {
