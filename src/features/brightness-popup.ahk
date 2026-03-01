@@ -99,7 +99,6 @@ DrawBrightnessPopup(level) {
     global BRIGHTNESS_POPUP_WIDTH
     global BRIGHTNESS_POPUP_HEIGHT
     global BRIGHTNESS_POPUP_RADIUS
-    global BRIGHTNESS_POPUP_BAR_COLOR
     global BRIGHTNESS_POPUP_RENDER_SCALE
 
     theme := GetBrightnessPopupTheme()
@@ -123,7 +122,7 @@ DrawBrightnessPopup(level) {
     sunRayGap := 2
     sunRayThickness := 1.25
     sunRayCount := 8
-    barFillColor := BRIGHTNESS_POPUP_BAR_COLOR != "" ? BRIGHTNESS_POPUP_BAR_COLOR : theme.barFill
+    barFillColor := ResolveBrightnessPopupBarColor(theme)
 
     scaledWidth := popupWidth * renderScale
     scaledHeight := popupHeight * renderScale
@@ -328,6 +327,7 @@ GetBrightnessPopupTheme() {
 
     if (isLight) {
         return {
+            isLight: true,
             popupBg: "F3F3F3",
             popupAlpha: 250,
             barBg: "D1D1D1",
@@ -337,12 +337,33 @@ GetBrightnessPopupTheme() {
     }
 
     return {
+        isLight: false,
         popupBg: "2C2C2C",
         popupAlpha: 245,
         barBg: "4D4D4D",
         barFill: "60CDFF",
         icon: "FFFFFF"
     }
+}
+
+ResolveBrightnessPopupBarColor(theme) {
+    global BRIGHTNESS_POPUP_BAR_COLOR
+    global BRIGHTNESS_POPUP_BAR_COLOR_LIGHT
+    global BRIGHTNESS_POPUP_BAR_COLOR_DARK
+
+    if (BRIGHTNESS_POPUP_BAR_COLOR != "") {
+        return BRIGHTNESS_POPUP_BAR_COLOR
+    }
+
+    if (theme.isLight && BRIGHTNESS_POPUP_BAR_COLOR_LIGHT != "") {
+        return BRIGHTNESS_POPUP_BAR_COLOR_LIGHT
+    }
+
+    if (!theme.isLight && BRIGHTNESS_POPUP_BAR_COLOR_DARK != "") {
+        return BRIGHTNESS_POPUP_BAR_COLOR_DARK
+    }
+
+    return theme.barFill
 }
 
 GetTaskbarTop() {
