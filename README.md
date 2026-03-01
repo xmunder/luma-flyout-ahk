@@ -4,11 +4,11 @@ OSD de brillo personalizado para Windows en AutoHotkey v2, con control por WMI y
 
 ## Demo
 
-<div style="display: flex; gap: 10px;">
+<div style="display: flex; gap: 10px; align-items: center;">
 
-![Demo de volumen](<./assets/demo_volume.gif>)
+<img src="./assets/demo_volume.gif" alt="Demo de volumen" width="200" height="auto">
 
-![Demo de brillo](<./assets/demo_brightness.gif>)
+<img src="./assets/demo_brightness.gif" alt="Demo de brillo" width="200" height="auto">
 
 </div>
 
@@ -33,6 +33,8 @@ El proyecto incluye `build.ps1` para compilar `main.ahk` con `Ahk2Exe`.
 .\build.ps1
 ```
 
+Al terminar la compilacion, el script pregunta si quieres crear un acceso directo en la carpeta `Startup` del usuario para iniciar con Windows.
+
 Opciones comunes:
 
 ```powershell
@@ -40,6 +42,8 @@ Opciones comunes:
 .\build.ps1 -CompilerPath "C:\Program Files\AutoHotkey\Compiler\Ahk2Exe.exe"
 .\build.ps1 -BaseFilePath "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe"
 .\build.ps1 -IconPath ".\assets\logo_icon.ico"
+.\build.ps1 -SkipStartupPrompt
+.\build.ps1 -StartWithWindows
 ```
 
 ## Atajos por defecto

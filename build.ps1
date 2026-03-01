@@ -4,7 +4,9 @@ param(
     [string]$CompilerPath = "",
     [string]$BaseFilePath = "",
     [string]$IconPath = "",
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$SkipStartupPrompt,
+    [switch]$StartWithWindows
 )
 
 Set-StrictMode -Version Latest
@@ -202,6 +204,86 @@ function Wait-ForFile {
     return $false
 }
 
+function Test-CanPromptForInput {
+    if (-not [System.Environment]::UserInteractive) {
+        return $false
+    }
+
+    try {
+        return (-not [System.Console]::IsInputRedirected)
+    }
+    catch {
+        return $true
+    }
+}
+
+function Confirm-StartWithWindows {
+    param([string]$ExecutablePath)
+
+    if (-not (Test-CanPromptForInput)) {
+        Write-Host "No se pudo pedir confirmacion interactiva. Usa -StartWithWindows para habilitar el inicio automatico."
+        return $null
+    }
+
+    $appName = [System.IO.Path]::GetFileName($ExecutablePath)
+
+    while ($true) {
+        $answer = Read-Host "Quieres que $appName arranque con Windows? [S/N]"
+        if ([string]::IsNullOrWhiteSpace($answer)) {
+            continue
+        }
+
+        switch -Regex ($answer.Trim().ToLowerInvariant()) {
+            "^(s|si|y|yes)$" {
+                return $true
+            }
+            "^(n|no)$" {
+                return $false
+            }
+        }
+
+        Write-Host "Respuesta no valida. Escribe S o N."
+    }
+}
+
+function Enable-StartupLaunch {
+    param([string]$ExecutablePath)
+
+    $startupDir = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
+    if ([string]::IsNullOrWhiteSpace($startupDir)) {
+        throw "No se pudo resolver la carpeta Startup de Windows."
+    }
+
+    if (-not (Test-Path -LiteralPath $startupDir)) {
+        New-Item -ItemType Directory -Path $startupDir | Out-Null
+    }
+
+    $shortcutName = "{0}.lnk" -f [System.IO.Path]::GetFileNameWithoutExtension($ExecutablePath)
+    $shortcutPath = Join-Path $startupDir $shortcutName
+    $shell = $null
+    $shortcut = $null
+
+    try {
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $ExecutablePath
+        $shortcut.WorkingDirectory = Split-Path -Parent $ExecutablePath
+        $shortcut.IconLocation = $ExecutablePath
+        $shortcut.Save()
+    }
+    finally {
+        if ($shortcut) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut)
+        }
+
+        if ($shell) {
+            [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)
+        }
+    }
+
+    return $shortcutPath
+}
+
 function Resolve-BuildIcon {
     param(
         [string]$PreferredPath,
@@ -284,6 +366,22 @@ if (-not (Wait-ForFile -Path $ResolvedOutput)) {
 
 if (-not (Test-Path -LiteralPath $ResolvedOutput)) {
     throw "Ahk2Exe no genero el ejecutable esperado: $ResolvedOutput. Revisa si creo '$SourceName.exe' junto al script o si mostro un error adicional."
+}
+
+$startupPreference = $null
+if ($StartWithWindows) {
+    $startupPreference = $true
+}
+elseif (-not $SkipStartupPrompt) {
+    $startupPreference = Confirm-StartWithWindows -ExecutablePath $ResolvedOutput
+}
+
+if ($startupPreference -eq $true) {
+    $startupShortcut = Enable-StartupLaunch -ExecutablePath $ResolvedOutput
+    Write-Host "Inicio con Windows habilitado: $startupShortcut"
+}
+elseif ($startupPreference -eq $false) {
+    Write-Host "Inicio con Windows omitido."
 }
 
 Write-Host "Compilacion completada."
