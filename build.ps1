@@ -2,6 +2,7 @@ param(
     [string]$SourcePath = "main.ahk",
     [string]$OutputName = "",
     [string]$CompilerPath = "",
+    [string]$IconPath = "",
     [switch]$Clean
 )
 
@@ -65,13 +66,145 @@ function Resolve-AhkCompiler {
     throw "No se encontro Ahk2Exe.exe. Instala AutoHotkey v2 con el compilador o pasa -CompilerPath."
 }
 
+function Convert-PngToIco {
+    param(
+        [string]$PngPath,
+        [string]$IcoPath
+    )
+
+    Add-Type -AssemblyName System.Drawing
+    if (-not ("NativeIcon" -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class NativeIcon {
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern bool DestroyIcon(IntPtr handle);
+}
+"@
+    }
+
+    $sourceBitmap = $null
+    $iconBitmap = $null
+    $graphics = $null
+    $icon = $null
+    $stream = $null
+    $iconHandle = [System.IntPtr]::Zero
+
+    try {
+        $sourceBitmap = New-Object System.Drawing.Bitmap($PngPath)
+        $iconSize = [Math]::Min([Math]::Max($sourceBitmap.Width, $sourceBitmap.Height), 256)
+        $iconBitmap = New-Object System.Drawing.Bitmap($iconSize, $iconSize)
+        $graphics = [System.Drawing.Graphics]::FromImage($iconBitmap)
+        $graphics.Clear([System.Drawing.Color]::Transparent)
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+
+        $scale = [Math]::Min($iconSize / $sourceBitmap.Width, $iconSize / $sourceBitmap.Height)
+        $drawWidth = [int][Math]::Round($sourceBitmap.Width * $scale)
+        $drawHeight = [int][Math]::Round($sourceBitmap.Height * $scale)
+        $offsetX = [int][Math]::Floor(($iconSize - $drawWidth) / 2)
+        $offsetY = [int][Math]::Floor(($iconSize - $drawHeight) / 2)
+
+        $graphics.DrawImage($sourceBitmap, $offsetX, $offsetY, $drawWidth, $drawHeight)
+
+        $iconHandle = $iconBitmap.GetHicon()
+        $icon = [System.Drawing.Icon]::FromHandle($iconHandle)
+        $stream = [System.IO.File]::Open($IcoPath, [System.IO.FileMode]::Create)
+        $icon.Save($stream)
+    }
+    finally {
+        if ($stream) {
+            $stream.Dispose()
+        }
+
+        if ($icon) {
+            $icon.Dispose()
+        }
+
+        if ($iconHandle -ne [System.IntPtr]::Zero) {
+            [NativeIcon]::DestroyIcon($iconHandle) | Out-Null
+        }
+
+        if ($graphics) {
+            $graphics.Dispose()
+        }
+
+        if ($iconBitmap) {
+            $iconBitmap.Dispose()
+        }
+
+        if ($sourceBitmap) {
+            $sourceBitmap.Dispose()
+        }
+    }
+}
+
+function Resolve-BuildIcon {
+    param(
+        [string]$PreferredPath,
+        [string]$RootPath,
+        [string]$OutputDir
+    )
+
+    $candidatePath = $PreferredPath
+    if ([string]::IsNullOrWhiteSpace($candidatePath)) {
+        $defaultIco = Join-Path $RootPath "assets\logo_icon.ico"
+        $defaultPng = Join-Path $RootPath "assets\logo_icon.png"
+
+        if (Test-Path -LiteralPath $defaultIco) {
+            $candidatePath = $defaultIco
+        }
+        elseif (Test-Path -LiteralPath $defaultPng) {
+            $candidatePath = $defaultPng
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($candidatePath)) {
+        return $null
+    }
+
+    $resolvedCandidate = $candidatePath
+    if (-not [System.IO.Path]::IsPathRooted($resolvedCandidate)) {
+        $resolvedCandidate = Join-Path $RootPath $resolvedCandidate
+    }
+
+    if (-not (Test-Path -LiteralPath $resolvedCandidate)) {
+        throw "No se encontro el icono indicado: $resolvedCandidate"
+    }
+
+    $extension = [System.IO.Path]::GetExtension($resolvedCandidate)
+    if ($extension -ieq ".ico") {
+        return (Resolve-Path -LiteralPath $resolvedCandidate).Path
+    }
+
+    if ($extension -ieq ".png") {
+        $generatedIcon = Join-Path $OutputDir "_build_icon.ico"
+        Convert-PngToIco -PngPath $resolvedCandidate -IcoPath $generatedIcon
+        return $generatedIcon
+    }
+
+    throw "El icono debe estar en formato .ico o .png: $resolvedCandidate"
+}
+
 $ResolvedCompiler = Resolve-AhkCompiler -PreferredPath $CompilerPath
+$ResolvedIcon = Resolve-BuildIcon -PreferredPath $IconPath -RootPath $ProjectRoot -OutputDir $DistDir
 
 Write-Host "Compilando $ResolvedSource"
 Write-Host "Compilador: $ResolvedCompiler"
 Write-Host "Salida: $ResolvedOutput"
+if ($ResolvedIcon) {
+    Write-Host "Icono: $ResolvedIcon"
+}
 
-& $ResolvedCompiler /in $ResolvedSource /out $ResolvedOutput
+$compilerArgs = @("/in", $ResolvedSource, "/out", $ResolvedOutput)
+if ($ResolvedIcon) {
+    $compilerArgs += @("/icon", $ResolvedIcon)
+}
+
+& $ResolvedCompiler @compilerArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "Ahk2Exe devolvio un codigo de salida $LASTEXITCODE."
