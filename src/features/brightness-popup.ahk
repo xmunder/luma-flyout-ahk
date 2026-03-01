@@ -7,18 +7,18 @@ global BrightnessPopupReady := false
 OnExit((*) => ShutdownBrightnessPopup())
 
 ShowBrightnessGui(level) {
-    global BRIGHTNESS_POPUP_WIDTH
-    global BRIGHTNESS_POPUP_HEIGHT
     global BRIGHTNESS_POPUP_MARGIN_BOTTOM
     global BRIGHTNESS_POPUP_TIMEOUT_MS
     global BrightnessPopupCloseTimer
     global BrightnessPopupHwnd
 
-    EnsureBrightnessPopupReady()
-    DrawBrightnessPopup(level)
+    metrics := GetBrightnessPopupMetrics()
 
-    x := Max(0, (A_ScreenWidth - BRIGHTNESS_POPUP_WIDTH) // 2)
-    y := Max(0, GetTaskbarTop() - BRIGHTNESS_POPUP_HEIGHT - BRIGHTNESS_POPUP_MARGIN_BOTTOM)
+    EnsureBrightnessPopupReady()
+    DrawBrightnessPopup(level, metrics)
+
+    x := Max(0, (A_ScreenWidth - metrics.windowWidth) // 2)
+    y := Max(0, GetTaskbarTop() - metrics.contentHeight - BRIGHTNESS_POPUP_MARGIN_BOTTOM - metrics.contentY)
 
     DllCall(
         "SetWindowPos",
@@ -70,11 +70,9 @@ EnsureBrightnessPopupReady() {
 }
 
 CreateBrightnessLayeredPopup() {
-    global BRIGHTNESS_POPUP_WIDTH
-    global BRIGHTNESS_POPUP_HEIGHT
-
     exStyle := 0x80000 | 0x8 | 0x80 | 0x20 | 0x8000000
     style := 0x80000000
+    metrics := GetBrightnessPopupMetrics()
 
     return DllCall(
         "CreateWindowEx",
@@ -84,8 +82,8 @@ CreateBrightnessLayeredPopup() {
         "uint", style,
         "int", 0,
         "int", 0,
-        "int", BRIGHTNESS_POPUP_WIDTH,
-        "int", BRIGHTNESS_POPUP_HEIGHT,
+        "int", metrics.windowWidth,
+        "int", metrics.windowHeight,
         "ptr", 0,
         "ptr", 0,
         "ptr", 0,
@@ -94,10 +92,26 @@ CreateBrightnessLayeredPopup() {
     )
 }
 
-DrawBrightnessPopup(level) {
-    global BrightnessPopupHwnd
+GetBrightnessPopupMetrics() {
     global BRIGHTNESS_POPUP_WIDTH
     global BRIGHTNESS_POPUP_HEIGHT
+    global BRIGHTNESS_POPUP_SHADOW_SIZE
+    global BRIGHTNESS_POPUP_SHADOW_OFFSET_Y
+
+    return {
+        contentWidth: BRIGHTNESS_POPUP_WIDTH,
+        contentHeight: BRIGHTNESS_POPUP_HEIGHT,
+        contentX: BRIGHTNESS_POPUP_SHADOW_SIZE,
+        contentY: BRIGHTNESS_POPUP_SHADOW_SIZE,
+        shadowSize: BRIGHTNESS_POPUP_SHADOW_SIZE,
+        shadowOffsetY: BRIGHTNESS_POPUP_SHADOW_OFFSET_Y,
+        windowWidth: BRIGHTNESS_POPUP_WIDTH + (BRIGHTNESS_POPUP_SHADOW_SIZE * 2),
+        windowHeight: BRIGHTNESS_POPUP_HEIGHT + (BRIGHTNESS_POPUP_SHADOW_SIZE * 2) + BRIGHTNESS_POPUP_SHADOW_OFFSET_Y
+    }
+}
+
+DrawBrightnessPopup(level, metrics) {
+    global BrightnessPopupHwnd
     global BRIGHTNESS_POPUP_RADIUS
     global BRIGHTNESS_POPUP_BAR_WIDTH
     global BRIGHTNESS_POPUP_RENDER_SCALE
@@ -105,8 +119,10 @@ DrawBrightnessPopup(level) {
     theme := GetBrightnessPopupTheme()
     level := Round(Max(0, Min(100, level)))
 
-    popupWidth := BRIGHTNESS_POPUP_WIDTH
-    popupHeight := BRIGHTNESS_POPUP_HEIGHT
+    popupWidth := metrics.contentWidth
+    popupHeight := metrics.contentHeight
+    windowWidth := metrics.windowWidth
+    windowHeight := metrics.windowHeight
     renderScale := BRIGHTNESS_POPUP_RENDER_SCALE
 
     barWidth := BRIGHTNESS_POPUP_BAR_WIDTH
@@ -123,19 +139,24 @@ DrawBrightnessPopup(level) {
     sunRayGap := 2
     sunRayThickness := 1.25
     sunRayCount := 8
-    activeRayCount := Ceil((level * sunRayCount) / 100)
     barFillColor := ResolveBrightnessPopupBarColor(theme)
     borderColor := ResolveBrightnessPopupBorderColor(theme)
 
     scaledWidth := popupWidth * renderScale
     scaledHeight := popupHeight * renderScale
+    scaledWindowWidth := windowWidth * renderScale
+    scaledWindowHeight := windowHeight * renderScale
     scaledRadius := BRIGHTNESS_POPUP_RADIUS * renderScale
+    contentX := metrics.contentX * renderScale
+    contentY := metrics.contentY * renderScale
+    shadowSize := metrics.shadowSize * renderScale
+    shadowOffsetY := metrics.shadowOffsetY * renderScale
 
     largeBitmap := 0
     DllCall(
         "gdiplus\GdipCreateBitmapFromScan0",
-        "int", scaledWidth,
-        "int", scaledHeight,
+        "int", scaledWindowWidth,
+        "int", scaledWindowHeight,
         "int", 0,
         "int", 0x26200A,
         "ptr", 0,
@@ -149,12 +170,14 @@ DrawBrightnessPopup(level) {
     DllCall("gdiplus\GdipSetCompositingQuality", "ptr", graphics, "int", 4)
     DllCall("gdiplus\GdipGraphicsClear", "ptr", graphics, "uint", 0x00000000)
 
+    DrawBrightnessPopupShadow(graphics, contentX, contentY, scaledWidth, scaledHeight, scaledRadius, shadowSize, shadowOffsetY, theme)
+
     backgroundArgb := (theme.popupAlpha << 24) | HexToInt(theme.popupBg)
     backgroundBrush := 0
     DllCall("gdiplus\GdipCreateSolidFill", "uint", backgroundArgb, "ptr*", &backgroundBrush)
     backgroundPath := 0
     DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &backgroundPath)
-    AddRoundedRectPath(backgroundPath, 0, 0, scaledWidth, scaledHeight, scaledRadius)
+    AddRoundedRectPath(backgroundPath, contentX, contentY, scaledWidth, scaledHeight, scaledRadius)
     DllCall("gdiplus\GdipFillPath", "ptr", graphics, "ptr", backgroundBrush, "ptr", backgroundPath)
 
     borderWidth := 1.0 * renderScale
@@ -166,8 +189,8 @@ DrawBrightnessPopup(level) {
     DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &borderPath)
     AddRoundedRectPath(
         borderPath,
-        borderInset,
-        borderInset,
+        contentX + borderInset,
+        contentY + borderInset,
         scaledWidth - borderWidth,
         scaledHeight - borderWidth,
         Max(0, scaledRadius - borderInset)
@@ -180,8 +203,8 @@ DrawBrightnessPopup(level) {
     DllCall("gdiplus\GdipDeletePath", "ptr", backgroundPath)
 
     iconSize := (sunCenterRadius + sunRayGap + sunRayLength) * 2 * renderScale
-    iconX := iconMarginLeft * renderScale
-    iconY := iconMarginTop * renderScale
+    iconX := (metrics.contentX + iconMarginLeft) * renderScale
+    iconY := (metrics.contentY + iconMarginTop) * renderScale
     centerRadius := sunCenterRadius * renderScale
     rayLength := sunRayLength * renderScale
     rayGap := sunRayGap * renderScale
@@ -208,15 +231,20 @@ DrawBrightnessPopup(level) {
     DllCall("gdiplus\GdipSetPenStartCap", "ptr", iconPen, "int", 2)
     DllCall("gdiplus\GdipSetPenEndCap", "ptr", iconPen, "int", 2)
 
+    normalizedLevel := level / 100.0
+    globalRayLengthScale := 0.55 + (0.45 * normalizedLevel)
     pi := 3.14159265358979
     Loop sunRayCount {
-        if (GetBrightnessRayRank(A_Index) > activeRayCount) {
+        rayRank := GetBrightnessRayRank(A_Index)
+        rayStrength := GetBrightnessRayStrength(level, rayRank, sunRayCount)
+        if (rayStrength <= 0) {
             continue
         }
 
         angle := (A_Index - 1) * (2 * pi / sunRayCount)
         startDistance := centerRadius + rayGap
-        endDistance := centerRadius + rayGap + rayLength
+        currentRayLength := Max(1.0 * renderScale, rayLength * globalRayLengthScale * (0.35 + (0.65 * rayStrength)))
+        endDistance := centerRadius + rayGap + currentRayLength
         x1 := centerX + Cos(angle) * startDistance
         y1 := centerY + Sin(angle) * startDistance
         x2 := centerX + Cos(angle) * endDistance
@@ -234,8 +262,8 @@ DrawBrightnessPopup(level) {
     }
     DllCall("gdiplus\GdipDeletePen", "ptr", iconPen)
 
-    barX := barMarginLeft * renderScale
-    barY := barMarginTop * renderScale
+    barX := (metrics.contentX + barMarginLeft) * renderScale
+    barY := (metrics.contentY + barMarginTop) * renderScale
     scaledBarWidth := barWidth * renderScale
     scaledBarHeight := barHeight * renderScale
     scaledBarRadius := barRadius * renderScale
@@ -275,8 +303,8 @@ DrawBrightnessPopup(level) {
     finalBitmap := 0
     DllCall(
         "gdiplus\GdipCreateBitmapFromScan0",
-        "int", popupWidth,
-        "int", popupHeight,
+        "int", windowWidth,
+        "int", windowHeight,
         "int", 0,
         "int", 0x26200A,
         "ptr", 0,
@@ -295,8 +323,8 @@ DrawBrightnessPopup(level) {
         "ptr", largeBitmap,
         "int", 0,
         "int", 0,
-        "int", popupWidth,
-        "int", popupHeight
+        "int", windowWidth,
+        "int", windowHeight
     )
     DllCall("gdiplus\GdipDeleteGraphics", "ptr", finalGraphics)
     DllCall("gdiplus\GdipDisposeImage", "ptr", largeBitmap)
@@ -310,8 +338,8 @@ DrawBrightnessPopup(level) {
     oldBitmap := DllCall("SelectObject", "ptr", memDc, "ptr", hBitmap, "ptr")
 
     sizeBuffer := Buffer(8, 0)
-    NumPut("int", popupWidth, sizeBuffer, 0)
-    NumPut("int", popupHeight, sizeBuffer, 4)
+    NumPut("int", windowWidth, sizeBuffer, 0)
+    NumPut("int", windowHeight, sizeBuffer, 4)
 
     sourcePoint := Buffer(8, 0)
 
@@ -358,6 +386,9 @@ GetBrightnessPopupTheme() {
             popupBg: "F3F3F3",
             popupAlpha: 250,
             borderAlpha: 220,
+            shadowColor: "000000",
+            shadowInnerAlpha: 30,
+            shadowOuterAlpha: 14,
             barBg: "D1D1D1",
             barFill: "0067C0",
             icon: "1A1A1A"
@@ -369,6 +400,9 @@ GetBrightnessPopupTheme() {
         popupBg: "2C2C2C",
         popupAlpha: 245,
         borderAlpha: 210,
+        shadowColor: "000000",
+        shadowInnerAlpha: 48,
+        shadowOuterAlpha: 22,
         barBg: "4D4D4D",
         barFill: "60CDFF",
         icon: "FFFFFF"
@@ -426,6 +460,61 @@ GetBrightnessRayRank(rayIndex) {
     }
 
     return rayOrder.Length + 1
+}
+
+GetBrightnessRayStrength(level, rayRank, totalRays) {
+    fillUnits := (level / 100.0) * totalRays
+    return Min(1.0, Max(0.0, fillUnits - (rayRank - 1)))
+}
+
+DrawBrightnessPopupShadow(graphics, x, y, width, height, radius, shadowSize, shadowOffsetY, theme) {
+    if (shadowSize <= 0) {
+        return
+    }
+
+    DrawBrightnessShadowLayer(
+        graphics,
+        x,
+        y,
+        width,
+        height,
+        radius,
+        shadowSize,
+        shadowOffsetY,
+        theme.shadowOuterAlpha,
+        theme.shadowColor
+    )
+    DrawBrightnessShadowLayer(
+        graphics,
+        x,
+        y,
+        width,
+        height,
+        radius,
+        Max(1.0, shadowSize * 0.55),
+        shadowOffsetY * 0.5,
+        theme.shadowInnerAlpha,
+        theme.shadowColor
+    )
+}
+
+DrawBrightnessShadowLayer(graphics, x, y, width, height, radius, expand, offsetY, alpha, colorHex) {
+    shadowArgb := (alpha << 24) | HexToInt(colorHex)
+    shadowBrush := 0
+    DllCall("gdiplus\GdipCreateSolidFill", "uint", shadowArgb, "ptr*", &shadowBrush)
+    shadowPath := 0
+    DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &shadowPath)
+    AddRoundedRectPath(
+        shadowPath,
+        x - expand,
+        y - expand + offsetY,
+        width + (expand * 2),
+        height + (expand * 2),
+        radius + expand
+    )
+    DllCall("gdiplus\GdipFillPath", "ptr", graphics, "ptr", shadowBrush, "ptr", shadowPath)
+    DllCall("gdiplus\GdipDeleteBrush", "ptr", shadowBrush)
+    DllCall("gdiplus\GdipDeletePath", "ptr", shadowPath)
 }
 
 GetTaskbarTop() {
