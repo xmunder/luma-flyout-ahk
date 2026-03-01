@@ -11,7 +11,6 @@ global BrightnessPopupOpacity := 0.0
 OnExit((*) => ShutdownBrightnessPopup())
 
 ShowBrightnessGui(level) {
-    global BRIGHTNESS_POPUP_MARGIN_BOTTOM
     global BRIGHTNESS_POPUP_TIMEOUT_MS
     global BRIGHTNESS_POPUP_FADE_INTERVAL_MS
     global BRIGHTNESS_POPUP_FADE_MIN_ALPHA
@@ -27,20 +26,6 @@ ShowBrightnessGui(level) {
     EnsureBrightnessPopupReady()
     BrightnessPopupLevel := level
 
-    x := Max(0, (A_ScreenWidth - metrics.windowWidth) // 2)
-    y := Max(0, GetTaskbarTop() - metrics.contentHeight - BRIGHTNESS_POPUP_MARGIN_BOTTOM - metrics.contentY)
-
-    DllCall(
-        "SetWindowPos",
-        "ptr", BrightnessPopupHwnd,
-        "ptr", -1,
-        "int", x,
-        "int", y,
-        "int", 0,
-        "int", 0,
-        "uint", 0x0041
-    )
-
     SetTimer(BrightnessPopupHideTimer, 0)
 
     if (BrightnessPopupOpacity <= 0.0) {
@@ -50,6 +35,7 @@ ShowBrightnessGui(level) {
     }
 
     BrightnessPopupFadeDirection := 1
+    PositionBrightnessPopup(metrics, BrightnessPopupOpacity)
     DrawBrightnessPopup(BrightnessPopupLevel, metrics, BrightnessPopupOpacity)
 
     SetTimer(BrightnessPopupFadeTimer, 0)
@@ -130,6 +116,41 @@ GetBrightnessPopupMetrics() {
         windowWidth: BRIGHTNESS_POPUP_WIDTH + (BRIGHTNESS_POPUP_SHADOW_SIZE * 2),
         windowHeight: BRIGHTNESS_POPUP_HEIGHT + (BRIGHTNESS_POPUP_SHADOW_SIZE * 2) + BRIGHTNESS_POPUP_SHADOW_OFFSET_Y
     }
+}
+
+GetBrightnessPopupBaseY(metrics) {
+    global BRIGHTNESS_POPUP_MARGIN_BOTTOM
+
+    return Max(0, GetTaskbarTop() - metrics.contentHeight - BRIGHTNESS_POPUP_MARGIN_BOTTOM - metrics.contentY)
+}
+
+GetBrightnessPopupMotionRatio(opacity) {
+    global BRIGHTNESS_POPUP_FADE_MIN_ALPHA
+
+    if (opacity <= BRIGHTNESS_POPUP_FADE_MIN_ALPHA) {
+        return 1.0
+    }
+
+    return 1.0 - Min(1.0, Max(0.0, (opacity - BRIGHTNESS_POPUP_FADE_MIN_ALPHA) / (1.0 - BRIGHTNESS_POPUP_FADE_MIN_ALPHA)))
+}
+
+PositionBrightnessPopup(metrics, opacity) {
+    global BRIGHTNESS_POPUP_MOTION_OFFSET
+    global BrightnessPopupHwnd
+
+    x := Max(0, (A_ScreenWidth - metrics.windowWidth) // 2)
+    y := GetBrightnessPopupBaseY(metrics) + Round(BRIGHTNESS_POPUP_MOTION_OFFSET * GetBrightnessPopupMotionRatio(opacity))
+
+    DllCall(
+        "SetWindowPos",
+        "ptr", BrightnessPopupHwnd,
+        "ptr", -1,
+        "int", x,
+        "int", y,
+        "int", 0,
+        "int", 0,
+        "uint", 0x0041
+    )
 }
 
 DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
@@ -456,7 +477,9 @@ AdvanceBrightnessPopupFade(*) {
     }
 
     if (BrightnessPopupOpacity > 0.0) {
-        DrawBrightnessPopup(BrightnessPopupLevel, GetBrightnessPopupMetrics(), BrightnessPopupOpacity)
+        metrics := GetBrightnessPopupMetrics()
+        PositionBrightnessPopup(metrics, BrightnessPopupOpacity)
+        DrawBrightnessPopup(BrightnessPopupLevel, metrics, BrightnessPopupOpacity)
     }
 
     if (BrightnessPopupFadeDirection = 0) {
