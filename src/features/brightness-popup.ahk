@@ -327,41 +327,6 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
         DllCall("gdiplus\GdipDeletePen", "ptr", rayPen)
     }
 
-    extraRayCount := Floor(normalizedLevel * sunRayCount)
-    Loop extraRayCount {
-        angle := ((A_Index - 0.5) * (2 * pi / sunRayCount)) + rotationOffset
-        extraStrength := Max(0.35, normalizedLevel)
-        currentRayLength := Max(0.65 * renderScale, rayLength * (0.45 + (0.4 * normalizedLevel)))
-        halfRayLength := currentRayLength / 2.0
-        orbitDistance := ringRadius + rayGap + halfRayLength + (0.55 * renderScale)
-        currentRayThickness := Max(0.75 * renderScale, rayThickness * 0.82)
-        rayArgb := BuildPopupArgb(theme.icon, Round(190 * extraStrength), opacityScale)
-        rayPen := 0
-        DllCall("gdiplus\GdipCreatePen1", "uint", rayArgb, "float", currentRayThickness, "int", 2, "ptr*", &rayPen)
-        DllCall("gdiplus\GdipSetPenStartCap", "ptr", rayPen, "int", 2)
-        DllCall("gdiplus\GdipSetPenEndCap", "ptr", rayPen, "int", 2)
-
-        tiltSign := Mod(A_Index, 2) = 0 ? 1 : -1
-        rayDirection := angle + (tiltSign * 0.22)
-        rayCenterX := centerX + Cos(angle) * orbitDistance
-        rayCenterY := centerY + Sin(angle) * orbitDistance
-        x1 := rayCenterX - (Cos(rayDirection) * halfRayLength)
-        y1 := rayCenterY - (Sin(rayDirection) * halfRayLength)
-        x2 := rayCenterX + (Cos(rayDirection) * halfRayLength)
-        y2 := rayCenterY + (Sin(rayDirection) * halfRayLength)
-
-        DllCall(
-            "gdiplus\GdipDrawLine",
-            "ptr", graphics,
-            "ptr", rayPen,
-            "float", x1,
-            "float", y1,
-            "float", x2,
-            "float", y2
-        )
-        DllCall("gdiplus\GdipDeletePen", "ptr", rayPen)
-    }
-
     barX := (metrics.contentX + barMarginLeft) * renderScale
     barY := (metrics.contentY + barMarginTop) * renderScale
     scaledBarWidth := barWidth * renderScale
