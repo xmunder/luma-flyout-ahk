@@ -72,6 +72,25 @@ Los atajos actuales salen de `src/config.ahk`.
 
 - `Ctrl + F11`: abre `KeyHistory`
 
+## Referencia de Símbolos en AutoHotkey
+
+Si editas los hotkeys en `src/config.ahk`, AutoHotkey usa símbolos para representar modificadores:
+
+- `^`: `Ctrl`
+- `+`: `Shift`
+- `!`: `Alt`
+- `#`: tecla `Windows`
+
+Ejemplos rápidos:
+
+- `^F1` significa `Ctrl + F1`
+- `+!Right` significa `Shift + Alt + Right`
+- `!Left` significa `Alt + Left`
+
+Documentación oficial:
+
+- https://www.autohotkey.com/docs/v2/Hotkeys.htm
+
 ## Configuración
 
 Todas las teclas se pueden cambiar desde `src/config.ahk`.
