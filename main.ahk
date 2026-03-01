@@ -7,4 +7,5 @@ InstallKeybdHook
 #Include "src/features/audio.ahk"
 #Include "src/features/navigation.ahk"
 #Include "src/features/diagnostics.ahk"
-#Include "src/features/brightness.ahk"
+#Include "src/features/brightness-popup.ahk"
+#Include "src/features/brightness-control.ahk"
