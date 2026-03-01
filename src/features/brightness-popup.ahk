@@ -176,7 +176,7 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     barFillRadius := 2
 
     iconMarginLeft := 11
-    sunRingRadius := 3.0
+    sunRingRadius := 5.0
     sunRingThickness := 1.15
     sunRayLength := 2.8
     sunRayGap := 1.8
@@ -293,13 +293,9 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     rotationOffset := (1.0 - normalizedLevel) * (3.14159265358979 / 2.8)
     pi := 3.14159265358979
     Loop sunRayCount {
-        rayRank := GetBrightnessRayRank(A_Index)
-        rayStrength := GetBrightnessRayStrength(level, rayRank, sunRayCount)
-        if (rayStrength <= 0.04) {
-            continue
-        }
-
         angle := ((A_Index - 1) * (2 * pi / sunRayCount)) + rotationOffset
+        rayPulse := 0.06 * Cos(angle - rotationOffset)
+        rayStrength := Max(0.24, Min(1.0, (0.24 + (0.76 * normalizedLevel)) + (rayPulse * (1.0 - normalizedLevel))))
         currentRayLength := Max(0.9 * renderScale, rayLength * globalRayLengthScale * (0.22 + (0.78 * rayStrength)))
         halfRayLength := currentRayLength / 2.0
         orbitDistance := ringRadius + rayGap + halfRayLength + (0.25 * renderScale)
@@ -579,24 +575,6 @@ ResolveBrightnessPopupBorderColor(theme) {
     }
 
     return theme.popupBg
-}
-
-GetBrightnessRayRank(rayIndex) {
-    ; Keep the icon balanced by hiding rays in opposite pairs.
-    static rayOrder := [1, 5, 3, 7, 2, 6, 4, 8]
-
-    Loop rayOrder.Length {
-        if (rayOrder[A_Index] = rayIndex) {
-            return A_Index
-        }
-    }
-
-    return rayOrder.Length + 1
-}
-
-GetBrightnessRayStrength(level, rayRank, totalRays) {
-    fillUnits := (level / 100.0) * totalRays
-    return Min(1.0, Max(0.0, fillUnits - (rayRank - 1)))
 }
 
 DrawBrightnessPopupShadow(graphics, x, y, width, height, radius, shadowSize, shadowOffsetY, theme, opacityScale) {
