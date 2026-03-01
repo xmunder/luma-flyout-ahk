@@ -99,6 +99,7 @@ DrawBrightnessPopup(level) {
     global BRIGHTNESS_POPUP_WIDTH
     global BRIGHTNESS_POPUP_HEIGHT
     global BRIGHTNESS_POPUP_RADIUS
+    global BRIGHTNESS_POPUP_BAR_COLOR
     global BRIGHTNESS_POPUP_RENDER_SCALE
 
     theme := GetBrightnessPopupTheme()
@@ -108,20 +109,21 @@ DrawBrightnessPopup(level) {
     popupHeight := BRIGHTNESS_POPUP_HEIGHT
     renderScale := BRIGHTNESS_POPUP_RENDER_SCALE
 
-    barWidth := 138
+    barWidth := 111
     barHeight := 4
-    barRadius := 3
-    barMarginTop := 22
-    barMarginLeft := 38
-    barFillRadius := 3
+    barRadius := 2
+    barMarginTop := 19
+    barMarginLeft := 42
+    barFillRadius := 2
 
-    iconMarginLeft := 12
-    iconMarginTop := 17
-    sunCenterRadius := 3
+    iconMarginLeft := 11
+    iconMarginTop := 13
+    sunCenterRadius := 2
     sunRayLength := 2
     sunRayGap := 2
-    sunRayThickness := 1.5
+    sunRayThickness := 1.25
     sunRayCount := 8
+    barFillColor := BRIGHTNESS_POPUP_BAR_COLOR != "" ? BRIGHTNESS_POPUP_BAR_COLOR : theme.barFill
 
     scaledWidth := popupWidth * renderScale
     scaledHeight := popupHeight * renderScale
@@ -229,7 +231,7 @@ DrawBrightnessPopup(level) {
             fillWidth := 2 * renderScale
         }
 
-        fillArgb := 0xFF000000 | HexToInt(theme.barFill)
+        fillArgb := 0xFF000000 | HexToInt(barFillColor)
         fillBrush := 0
         DllCall("gdiplus\GdipCreateSolidFill", "uint", fillArgb, "ptr*", &fillBrush)
         fillPath := 0
