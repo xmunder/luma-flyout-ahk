@@ -1,8 +1,9 @@
 ; Shared settings used across the script.
 global BRIGHTNESS_STEP := 10
-global BRIGHTNESS_POPUP_WIDTH := 169
+global BRIGHTNESS_POPUP_WIDTH := 248
 global BRIGHTNESS_POPUP_HEIGHT := 42
 global BRIGHTNESS_POPUP_RADIUS := 8
+global BRIGHTNESS_POPUP_BAR_WIDTH := 190
 global BRIGHTNESS_POPUP_BAR_COLOR := "" ; Forces the same RGB hex color in all themes.
 global BRIGHTNESS_POPUP_BAR_COLOR_LIGHT := "0067C0" ; RGB hex, `#` optional.
 global BRIGHTNESS_POPUP_BAR_COLOR_DARK := "60CDFF" ; RGB hex, `#` optional.

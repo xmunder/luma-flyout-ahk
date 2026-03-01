@@ -99,6 +99,7 @@ DrawBrightnessPopup(level) {
     global BRIGHTNESS_POPUP_WIDTH
     global BRIGHTNESS_POPUP_HEIGHT
     global BRIGHTNESS_POPUP_RADIUS
+    global BRIGHTNESS_POPUP_BAR_WIDTH
     global BRIGHTNESS_POPUP_RENDER_SCALE
 
     theme := GetBrightnessPopupTheme()
@@ -108,7 +109,7 @@ DrawBrightnessPopup(level) {
     popupHeight := BRIGHTNESS_POPUP_HEIGHT
     renderScale := BRIGHTNESS_POPUP_RENDER_SCALE
 
-    barWidth := 111
+    barWidth := BRIGHTNESS_POPUP_BAR_WIDTH
     barHeight := 4
     barRadius := 2
     barMarginTop := 19
