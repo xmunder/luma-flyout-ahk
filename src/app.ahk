@@ -1,32 +1,10 @@
-global BRIGHTNESS_STEP := 10
-global BRIGHTNESS_POPUP_WIDTH := 193
-global BRIGHTNESS_POPUP_HEIGHT := 50
-global BRIGHTNESS_POPUP_RADIUS := 10
-global BRIGHTNESS_POPUP_MARGIN_BOTTOM := 12
-global BRIGHTNESS_POPUP_TIMEOUT_MS := 1400
-global BRIGHTNESS_POPUP_RENDER_SCALE := 4
-global VOLUME_STEP := 5
-global OSD_TIMEOUT_MS := 1000
-global BRIGHTNESS_WMI_PATH := "winmgmts:{impersonationLevel=impersonate}!\\.\root\WMI"
-global ClearOsdTimer := ClearOsd.Bind()
+; Brightness feature and its popup renderer stay together for now.
 global BrightnessPopupCloseTimer := CloseBrightnessPopup.Bind()
 global BrightnessPopupHwnd := 0
 global BrightnessPopupGdipToken := 0
 global BrightnessPopupReady := false
 
 OnExit((*) => ShutdownBrightnessPopup())
-
-^F1::{
-    Send("{Volume_Mute}")
-}
-
-^F2::{
-    Send("{Volume_Up}")
-}
-
-^F3::{
-    Send("{Volume_Down}")
-}
 
 ^F4::{
     global BRIGHTNESS_STEP
@@ -36,50 +14,6 @@ OnExit((*) => ShutdownBrightnessPopup())
 ^F5::{
     global BRIGHTNESS_STEP
     AdjustBrightness(-BRIGHTNESS_STEP)
-}
-
-+!Right::{
-    Send("+{End}")
-}
-
-+!Left::{
-    Send("+{Home}")
-}
-
-!Right::{
-    Send("{End}")
-}
-
-!Left::{
-    Send("{Home}")
-}
-
-F12::{
-    Send("{PrintScreen}")
-}
-
-^F11::{
-    KeyHistory
-}
-
-ToggleMute() {
-    try {
-        SoundSetMute(-1)
-        state := SoundGetMute() ? "Mute" : "Activo"
-        ShowOsd("Volumen", Round(SoundGetVolume()), state)
-    } catch Error as err {
-        ShowDetailedError("No se pudo cambiar el audio", err)
-    }
-}
-
-AdjustVolume(step) {
-    try {
-        SoundSetVolume((step > 0 ? "+" : "") . step)
-        state := SoundGetMute() ? "Mute" : ""
-        ShowOsd("Volumen", Round(SoundGetVolume()), state)
-    } catch Error as err {
-        ShowDetailedError("No se pudo ajustar el audio", err)
-    }
 }
 
 AdjustBrightness(step) {
@@ -136,33 +70,6 @@ SetBrightness(level) {
     }
 
     return changed
-}
-
-ShowOsd(label, level, state := "") {
-    global OSD_TIMEOUT_MS
-    global ClearOsdTimer
-    static lastLabel := ""
-    static shownLevel := 0
-
-    if (lastLabel != label) {
-        shownLevel := level
-        RenderOsd(label, shownLevel, state)
-    } else {
-        delta := level - shownLevel
-        frames := Min(8, Max(1, Abs(delta)))
-
-        Loop frames {
-            frameLevel := Round(shownLevel + (delta * A_Index / frames))
-            RenderOsd(label, frameLevel, state)
-            Sleep(12)
-        }
-
-        shownLevel := level
-    }
-
-    lastLabel := label
-    SetTimer(ClearOsdTimer, 0)
-    SetTimer(ClearOsdTimer, -OSD_TIMEOUT_MS)
 }
 
 ShowBrightnessGui(level) {
@@ -567,61 +474,4 @@ AddRoundedRectPath(pathHandle, x, y, width, height, radius) {
 HexToInt(hexColor) {
     hexColor := StrReplace(hexColor, "#", "")
     return Integer("0x" hexColor)
-}
-
-RenderOsd(label, level, state := "") {
-    filled := Round(level / 10)
-    bar := "["
-
-    Loop 10 {
-        bar .= (A_Index <= filled) ? "#" : "-"
-    }
-
-    bar .= "]"
-
-    text := label ": " level "%"
-    if (state != "") {
-        text .= " | " state
-    }
-
-    x := Max(0, (A_ScreenWidth // 2) - 100)
-    ToolTip(text "`n" bar, x, 40)
-}
-
-ShowMessage(message) {
-    global ClearOsdTimer
-    x := Max(0, (A_ScreenWidth // 2) - 170)
-    ToolTip(message, x, 40)
-    SetTimer(ClearOsdTimer, 0)
-    SetTimer(ClearOsdTimer, -1400)
-}
-
-ShowDetailedError(prefix, err) {
-    details := prefix ".`n" err.Message
-
-    if (err.What != "") {
-        details .= "`nEn: " err.What
-    }
-
-    if (err.File != "") {
-        details .= "`nArchivo: " err.File
-    }
-
-    if (err.Line != "") {
-        details .= "`nLinea: " err.Line
-    }
-
-    if (err.Extra != "") {
-        details .= "`nExtra: " err.Extra
-    }
-
-    if (err.Stack != "") {
-        details .= "`n`nStack:`n" err.Stack
-    }
-
-    MsgBox(details, "Diagnostico AutoHotkey")
-}
-
-ClearOsd() {
-    ToolTip()
 }
