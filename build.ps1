@@ -2,6 +2,7 @@ param(
     [string]$SourcePath = "main.ahk",
     [string]$OutputName = "",
     [string]$CompilerPath = "",
+    [string]$BaseFilePath = "",
     [string]$IconPath = "",
     [switch]$Clean
 )
@@ -64,6 +65,45 @@ function Resolve-AhkCompiler {
     }
 
     throw "No se encontro Ahk2Exe.exe. Instala AutoHotkey v2 con el compilador o pasa -CompilerPath."
+}
+
+function Resolve-AhkBaseFile {
+    param(
+        [string]$PreferredPath,
+        [string]$ResolvedCompilerPath
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($PreferredPath)) {
+        if (Test-Path -LiteralPath $PreferredPath) {
+            return (Resolve-Path -LiteralPath $PreferredPath).Path
+        }
+
+        throw "No se encontro el Base file indicado: $PreferredPath"
+    }
+
+    $compilerDirectory = Split-Path -Parent $ResolvedCompilerPath
+    $installRoot = Split-Path -Parent $compilerDirectory
+    $candidates = @(
+        (Join-Path $compilerDirectory "Unicode 64-bit.bin"),
+        (Join-Path $compilerDirectory "Unicode 32-bit.bin"),
+        (Join-Path $compilerDirectory "AutoHotkey64.exe"),
+        (Join-Path $compilerDirectory "AutoHotkey32.exe"),
+        (Join-Path $compilerDirectory "AutoHotkey.exe"),
+        (Join-Path $installRoot "v2\AutoHotkey64.exe"),
+        (Join-Path $installRoot "v2\AutoHotkey32.exe"),
+        (Join-Path $installRoot "v2\AutoHotkey.exe"),
+        (Join-Path $installRoot "AutoHotkey64.exe"),
+        (Join-Path $installRoot "AutoHotkey32.exe"),
+        (Join-Path $installRoot "AutoHotkey.exe")
+    ) | Where-Object { $_ -and $_.Trim() -ne "" }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
+    throw "No se pudo resolver un Base file para Ahk2Exe. Usa -BaseFilePath o configura el Base file por defecto en Ahk2Exe."
 }
 
 function Convert-PngToIco {
@@ -190,24 +230,29 @@ function Resolve-BuildIcon {
 }
 
 $ResolvedCompiler = Resolve-AhkCompiler -PreferredPath $CompilerPath
+$ResolvedBaseFile = Resolve-AhkBaseFile -PreferredPath $BaseFilePath -ResolvedCompilerPath $ResolvedCompiler
 $ResolvedIcon = Resolve-BuildIcon -PreferredPath $IconPath -RootPath $ProjectRoot -OutputDir $DistDir
 
 Write-Host "Compilando $ResolvedSource"
 Write-Host "Compilador: $ResolvedCompiler"
+Write-Host "Base file: $ResolvedBaseFile"
 Write-Host "Salida: $ResolvedOutput"
 if ($ResolvedIcon) {
     Write-Host "Icono: $ResolvedIcon"
 }
 
-$compilerArgs = @("/in", $ResolvedSource, "/out", $ResolvedOutput)
+$compilerArgs = @("/in", $ResolvedSource, "/out", $ResolvedOutput, "/base", $ResolvedBaseFile)
 if ($ResolvedIcon) {
     $compilerArgs += @("/icon", $ResolvedIcon)
 }
 
-& $ResolvedCompiler @compilerArgs
+$process = Start-Process -FilePath $ResolvedCompiler -ArgumentList $compilerArgs -Wait -PassThru
+if ($process.ExitCode -ne 0) {
+    throw "Ahk2Exe devolvio un codigo de salida $($process.ExitCode)."
+}
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Ahk2Exe devolvio un codigo de salida $LASTEXITCODE."
+if (-not (Test-Path -LiteralPath $ResolvedOutput)) {
+    throw "Ahk2Exe no genero el ejecutable esperado: $ResolvedOutput"
 }
 
 Write-Host "Compilacion completada."
