@@ -289,18 +289,18 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     )
     DllCall("gdiplus\GdipDeletePen", "ptr", ringPen)
 
-    globalRayLengthScale := 0.28 + (0.72 * normalizedLevel)
+    baseRayLength := rayLength * 0.45
+    lowBrightnessScale := normalizedLevel < 0.30 ? (0.82 + (0.18 * (normalizedLevel / 0.30))) : 1.0
+    currentRayLength := Max(0.9 * renderScale, baseRayLength * lowBrightnessScale)
+    halfRayLength := currentRayLength / 2.0
+    orbitDistance := ringRadius + rayGap + halfRayLength + (0.25 * renderScale)
+    currentRayThickness := Max(0.85 * renderScale, rayThickness * 0.87)
+    rayAlpha := 210
     rotationOffset := (1.0 - normalizedLevel) * (3.14159265358979 / 2.8)
     pi := 3.14159265358979
     Loop sunRayCount {
         angle := ((A_Index - 1) * (2 * pi / sunRayCount)) + rotationOffset
-        rayPulse := 0.06 * Cos(angle - rotationOffset)
-        rayStrength := Max(0.24, Min(1.0, (0.24 + (0.76 * normalizedLevel)) + (rayPulse * (1.0 - normalizedLevel))))
-        currentRayLength := Max(0.9 * renderScale, rayLength * globalRayLengthScale * (0.22 + (0.78 * rayStrength)))
-        halfRayLength := currentRayLength / 2.0
-        orbitDistance := ringRadius + rayGap + halfRayLength + (0.25 * renderScale)
-        currentRayThickness := Max(0.85 * renderScale, rayThickness * (0.65 + (0.35 * rayStrength)))
-        rayArgb := BuildPopupArgb(theme.icon, Round(255 * (0.2 + (0.8 * rayStrength))), opacityScale)
+        rayArgb := BuildPopupArgb(theme.icon, rayAlpha, opacityScale)
         rayPen := 0
         DllCall("gdiplus\GdipCreatePen1", "uint", rayArgb, "float", currentRayThickness, "int", 2, "ptr*", &rayPen)
         DllCall("gdiplus\GdipSetPenStartCap", "ptr", rayPen, "int", 2)
