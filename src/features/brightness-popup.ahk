@@ -122,7 +122,9 @@ DrawBrightnessPopup(level) {
     sunRayGap := 2
     sunRayThickness := 1.25
     sunRayCount := 8
+    activeRayCount := Ceil((level * sunRayCount) / 100)
     barFillColor := ResolveBrightnessPopupBarColor(theme)
+    borderColor := ResolveBrightnessPopupBorderColor(theme)
 
     scaledWidth := popupWidth * renderScale
     scaledHeight := popupHeight * renderScale
@@ -153,6 +155,26 @@ DrawBrightnessPopup(level) {
     DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &backgroundPath)
     AddRoundedRectPath(backgroundPath, 0, 0, scaledWidth, scaledHeight, scaledRadius)
     DllCall("gdiplus\GdipFillPath", "ptr", graphics, "ptr", backgroundBrush, "ptr", backgroundPath)
+
+    borderWidth := 1.0 * renderScale
+    borderInset := borderWidth / 2.0
+    borderArgb := (theme.borderAlpha << 24) | HexToInt(borderColor)
+    borderPen := 0
+    DllCall("gdiplus\GdipCreatePen1", "uint", borderArgb, "float", borderWidth, "int", 2, "ptr*", &borderPen)
+    borderPath := 0
+    DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &borderPath)
+    AddRoundedRectPath(
+        borderPath,
+        borderInset,
+        borderInset,
+        scaledWidth - borderWidth,
+        scaledHeight - borderWidth,
+        Max(0, scaledRadius - borderInset)
+    )
+    DllCall("gdiplus\GdipDrawPath", "ptr", graphics, "ptr", borderPen, "ptr", borderPath)
+    DllCall("gdiplus\GdipDeletePen", "ptr", borderPen)
+    DllCall("gdiplus\GdipDeletePath", "ptr", borderPath)
+
     DllCall("gdiplus\GdipDeleteBrush", "ptr", backgroundBrush)
     DllCall("gdiplus\GdipDeletePath", "ptr", backgroundPath)
 
@@ -187,6 +209,10 @@ DrawBrightnessPopup(level) {
 
     pi := 3.14159265358979
     Loop sunRayCount {
+        if (GetBrightnessRayRank(A_Index) > activeRayCount) {
+            continue
+        }
+
         angle := (A_Index - 1) * (2 * pi / sunRayCount)
         startDistance := centerRadius + rayGap
         endDistance := centerRadius + rayGap + rayLength
@@ -330,6 +356,7 @@ GetBrightnessPopupTheme() {
             isLight: true,
             popupBg: "F3F3F3",
             popupAlpha: 250,
+            borderAlpha: 220,
             barBg: "D1D1D1",
             barFill: "0067C0",
             icon: "1A1A1A"
@@ -340,6 +367,7 @@ GetBrightnessPopupTheme() {
         isLight: false,
         popupBg: "2C2C2C",
         popupAlpha: 245,
+        borderAlpha: 210,
         barBg: "4D4D4D",
         barFill: "60CDFF",
         icon: "FFFFFF"
@@ -364,6 +392,39 @@ ResolveBrightnessPopupBarColor(theme) {
     }
 
     return theme.barFill
+}
+
+ResolveBrightnessPopupBorderColor(theme) {
+    global BRIGHTNESS_POPUP_BORDER_COLOR
+    global BRIGHTNESS_POPUP_BORDER_COLOR_LIGHT
+    global BRIGHTNESS_POPUP_BORDER_COLOR_DARK
+
+    if (BRIGHTNESS_POPUP_BORDER_COLOR != "") {
+        return BRIGHTNESS_POPUP_BORDER_COLOR
+    }
+
+    if (theme.isLight && BRIGHTNESS_POPUP_BORDER_COLOR_LIGHT != "") {
+        return BRIGHTNESS_POPUP_BORDER_COLOR_LIGHT
+    }
+
+    if (!theme.isLight && BRIGHTNESS_POPUP_BORDER_COLOR_DARK != "") {
+        return BRIGHTNESS_POPUP_BORDER_COLOR_DARK
+    }
+
+    return theme.popupBg
+}
+
+GetBrightnessRayRank(rayIndex) {
+    ; Keep the icon balanced by hiding rays in opposite pairs.
+    static rayOrder := [1, 5, 3, 7, 2, 6, 4, 8]
+
+    Loop rayOrder.Length {
+        if (rayOrder[A_Index] = rayIndex) {
+            return A_Index
+        }
+    }
+
+    return rayOrder.Length + 1
 }
 
 GetTaskbarTop() {
