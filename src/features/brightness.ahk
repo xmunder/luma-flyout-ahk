@@ -1,4 +1,4 @@
-; Brightness feature and its popup renderer stay together for now.
+; Brightness control and its custom popup.
 global BrightnessPopupCloseTimer := CloseBrightnessPopup.Bind()
 global BrightnessPopupHwnd := 0
 global BrightnessPopupGdipToken := 0
