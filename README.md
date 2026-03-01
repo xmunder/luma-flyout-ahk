@@ -6,9 +6,9 @@ Script modular en AutoHotkey v2 para controlar volumen, brillo, navegación y ut
 
 <div style="display: flex; gap: 10px;">
 
-![Demo adicional del OSD de brillo](<./Grabación de pantalla 2026-02-28 232138.gif>)
+![Demo de volumen](<./assets/demo_volume.gif>)
 
-![Demo principal del OSD de brillo](<./Grabación de pantalla 2026-02-28 230053.gif>)
+![Demo de brillo](<./assets/demo_brightness.gif>)
 </div>
 
 ## Características
@@ -38,8 +38,6 @@ Script modular en AutoHotkey v2 para controlar volumen, brillo, navegación y ut
 2. Clona o descarga este repositorio.
 3. Abre `src/config.ahk` si quieres cambiar atajos o parámetros visuales.
 4. Ejecuta `main.ahk`.
-
-También puedes ejecutar `shortcuts_v2.ahk`, que carga el mismo script principal.
 
 ## Compilación a EXE
 
