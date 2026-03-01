@@ -1,21 +1,31 @@
 ; Brightness popup renderer and GDI+ lifecycle.
-global BrightnessPopupCloseTimer := CloseBrightnessPopup.Bind()
+global BrightnessPopupFadeTimer := AdvanceBrightnessPopupFade.Bind()
+global BrightnessPopupHideTimer := BeginBrightnessPopupFadeOut.Bind()
 global BrightnessPopupHwnd := 0
 global BrightnessPopupGdipToken := 0
 global BrightnessPopupReady := false
+global BrightnessPopupFadeDirection := 0
+global BrightnessPopupLevel := 0
+global BrightnessPopupOpacity := 0.0
 
 OnExit((*) => ShutdownBrightnessPopup())
 
 ShowBrightnessGui(level) {
     global BRIGHTNESS_POPUP_MARGIN_BOTTOM
     global BRIGHTNESS_POPUP_TIMEOUT_MS
-    global BrightnessPopupCloseTimer
+    global BRIGHTNESS_POPUP_FADE_INTERVAL_MS
+    global BRIGHTNESS_POPUP_FADE_MIN_ALPHA
+    global BrightnessPopupFadeTimer
+    global BrightnessPopupHideTimer
     global BrightnessPopupHwnd
+    global BrightnessPopupFadeDirection
+    global BrightnessPopupLevel
+    global BrightnessPopupOpacity
 
     metrics := GetBrightnessPopupMetrics()
 
     EnsureBrightnessPopupReady()
-    DrawBrightnessPopup(level, metrics)
+    BrightnessPopupLevel := level
 
     x := Max(0, (A_ScreenWidth - metrics.windowWidth) // 2)
     y := Max(0, GetTaskbarTop() - metrics.contentHeight - BRIGHTNESS_POPUP_MARGIN_BOTTOM - metrics.contentY)
@@ -31,8 +41,20 @@ ShowBrightnessGui(level) {
         "uint", 0x0041
     )
 
-    SetTimer(BrightnessPopupCloseTimer, 0)
-    SetTimer(BrightnessPopupCloseTimer, -BRIGHTNESS_POPUP_TIMEOUT_MS)
+    SetTimer(BrightnessPopupHideTimer, 0)
+
+    if (BrightnessPopupOpacity <= 0.0) {
+        BrightnessPopupOpacity := BRIGHTNESS_POPUP_FADE_MIN_ALPHA
+    } else {
+        BrightnessPopupOpacity := Max(BrightnessPopupOpacity, BRIGHTNESS_POPUP_FADE_MIN_ALPHA)
+    }
+
+    BrightnessPopupFadeDirection := 1
+    DrawBrightnessPopup(BrightnessPopupLevel, metrics, BrightnessPopupOpacity)
+
+    SetTimer(BrightnessPopupFadeTimer, 0)
+    SetTimer(BrightnessPopupFadeTimer, BRIGHTNESS_POPUP_FADE_INTERVAL_MS)
+    SetTimer(BrightnessPopupHideTimer, -BRIGHTNESS_POPUP_TIMEOUT_MS)
 }
 
 EnsureBrightnessPopupReady() {
@@ -110,7 +132,7 @@ GetBrightnessPopupMetrics() {
     }
 }
 
-DrawBrightnessPopup(level, metrics) {
+DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     global BrightnessPopupHwnd
     global BRIGHTNESS_POPUP_RADIUS
     global BRIGHTNESS_POPUP_BAR_WIDTH
@@ -118,6 +140,8 @@ DrawBrightnessPopup(level, metrics) {
 
     theme := GetBrightnessPopupTheme()
     level := Round(Max(0, Min(100, level)))
+    opacityScale := Max(0.0, Min(1.0, opacityScale))
+    normalizedLevel := level / 100.0
 
     popupWidth := metrics.contentWidth
     popupHeight := metrics.contentHeight
@@ -134,10 +158,11 @@ DrawBrightnessPopup(level, metrics) {
 
     iconMarginLeft := 11
     iconMarginTop := 13
-    sunCenterRadius := 2
-    sunRayLength := 2
-    sunRayGap := 2
-    sunRayThickness := 1.25
+    sunRingRadius := 2.6
+    sunRingThickness := 1.15
+    sunRayLength := 2.4
+    sunRayGap := 1.6
+    sunRayThickness := 1.1
     sunRayCount := 8
     barFillColor := ResolveBrightnessPopupBarColor(theme)
     borderColor := ResolveBrightnessPopupBorderColor(theme)
@@ -170,9 +195,20 @@ DrawBrightnessPopup(level, metrics) {
     DllCall("gdiplus\GdipSetCompositingQuality", "ptr", graphics, "int", 4)
     DllCall("gdiplus\GdipGraphicsClear", "ptr", graphics, "uint", 0x00000000)
 
-    DrawBrightnessPopupShadow(graphics, contentX, contentY, scaledWidth, scaledHeight, scaledRadius, shadowSize, shadowOffsetY, theme)
+    DrawBrightnessPopupShadow(
+        graphics,
+        contentX,
+        contentY,
+        scaledWidth,
+        scaledHeight,
+        scaledRadius,
+        shadowSize,
+        shadowOffsetY,
+        theme,
+        opacityScale
+    )
 
-    backgroundArgb := (theme.popupAlpha << 24) | HexToInt(theme.popupBg)
+    backgroundArgb := BuildPopupArgb(theme.popupBg, theme.popupAlpha, opacityScale)
     backgroundBrush := 0
     DllCall("gdiplus\GdipCreateSolidFill", "uint", backgroundArgb, "ptr*", &backgroundBrush)
     backgroundPath := 0
@@ -182,7 +218,7 @@ DrawBrightnessPopup(level, metrics) {
 
     borderWidth := 1.0 * renderScale
     borderInset := borderWidth / 2.0
-    borderArgb := (theme.borderAlpha << 24) | HexToInt(borderColor)
+    borderArgb := BuildPopupArgb(borderColor, theme.borderAlpha, opacityScale)
     borderPen := 0
     DllCall("gdiplus\GdipCreatePen1", "uint", borderArgb, "float", borderWidth, "int", 2, "ptr*", &borderPen)
     borderPath := 0
@@ -202,49 +238,52 @@ DrawBrightnessPopup(level, metrics) {
     DllCall("gdiplus\GdipDeleteBrush", "ptr", backgroundBrush)
     DllCall("gdiplus\GdipDeletePath", "ptr", backgroundPath)
 
-    iconSize := (sunCenterRadius + sunRayGap + sunRayLength) * 2 * renderScale
+    iconSize := (sunRingRadius + sunRayGap + sunRayLength) * 2 * renderScale
     iconX := (metrics.contentX + iconMarginLeft) * renderScale
     iconY := (metrics.contentY + iconMarginTop) * renderScale
-    centerRadius := sunCenterRadius * renderScale
+    ringRadius := sunRingRadius * renderScale
+    ringThickness := sunRingThickness * renderScale
     rayLength := sunRayLength * renderScale
     rayGap := sunRayGap * renderScale
     rayThickness := sunRayThickness * renderScale
     centerX := iconX + iconSize / 2
     centerY := iconY + iconSize / 2
-    iconArgb := 0xFF000000 | HexToInt(theme.icon)
+    iconArgb := BuildPopupArgb(theme.icon, 255, opacityScale)
 
-    iconBrush := 0
-    DllCall("gdiplus\GdipCreateSolidFill", "uint", iconArgb, "ptr*", &iconBrush)
+    ringPen := 0
+    DllCall("gdiplus\GdipCreatePen1", "uint", iconArgb, "float", ringThickness, "int", 2, "ptr*", &ringPen)
     DllCall(
-        "gdiplus\GdipFillEllipse",
+        "gdiplus\GdipDrawEllipse",
         "ptr", graphics,
-        "ptr", iconBrush,
-        "float", centerX - centerRadius,
-        "float", centerY - centerRadius,
-        "float", centerRadius * 2,
-        "float", centerRadius * 2
+        "ptr", ringPen,
+        "float", centerX - ringRadius,
+        "float", centerY - ringRadius,
+        "float", ringRadius * 2,
+        "float", ringRadius * 2
     )
-    DllCall("gdiplus\GdipDeleteBrush", "ptr", iconBrush)
+    DllCall("gdiplus\GdipDeletePen", "ptr", ringPen)
 
-    iconPen := 0
-    DllCall("gdiplus\GdipCreatePen1", "uint", iconArgb, "float", rayThickness, "int", 2, "ptr*", &iconPen)
-    DllCall("gdiplus\GdipSetPenStartCap", "ptr", iconPen, "int", 2)
-    DllCall("gdiplus\GdipSetPenEndCap", "ptr", iconPen, "int", 2)
-
-    normalizedLevel := level / 100.0
-    globalRayLengthScale := 0.55 + (0.45 * normalizedLevel)
+    globalRayLengthScale := 0.25 + (0.75 * normalizedLevel)
+    rotationOffset := (1.0 - normalizedLevel) * (3.14159265358979 / sunRayCount)
     pi := 3.14159265358979
     Loop sunRayCount {
         rayRank := GetBrightnessRayRank(A_Index)
         rayStrength := GetBrightnessRayStrength(level, rayRank, sunRayCount)
-        if (rayStrength <= 0) {
+        if (rayStrength <= 0.04) {
             continue
         }
 
-        angle := (A_Index - 1) * (2 * pi / sunRayCount)
-        startDistance := centerRadius + rayGap
-        currentRayLength := Max(1.0 * renderScale, rayLength * globalRayLengthScale * (0.35 + (0.65 * rayStrength)))
-        endDistance := centerRadius + rayGap + currentRayLength
+        angle := ((A_Index - 1) * (2 * pi / sunRayCount)) + rotationOffset
+        startDistance := ringRadius + rayGap
+        currentRayLength := Max(0.7 * renderScale, rayLength * globalRayLengthScale * (0.2 + (0.8 * rayStrength)))
+        currentRayThickness := Max(0.85 * renderScale, rayThickness * (0.65 + (0.35 * rayStrength)))
+        rayArgb := BuildPopupArgb(theme.icon, Round(255 * (0.2 + (0.8 * rayStrength))), opacityScale)
+        rayPen := 0
+        DllCall("gdiplus\GdipCreatePen1", "uint", rayArgb, "float", currentRayThickness, "int", 2, "ptr*", &rayPen)
+        DllCall("gdiplus\GdipSetPenStartCap", "ptr", rayPen, "int", 2)
+        DllCall("gdiplus\GdipSetPenEndCap", "ptr", rayPen, "int", 2)
+
+        endDistance := startDistance + currentRayLength
         x1 := centerX + Cos(angle) * startDistance
         y1 := centerY + Sin(angle) * startDistance
         x2 := centerX + Cos(angle) * endDistance
@@ -253,14 +292,14 @@ DrawBrightnessPopup(level, metrics) {
         DllCall(
             "gdiplus\GdipDrawLine",
             "ptr", graphics,
-            "ptr", iconPen,
+            "ptr", rayPen,
             "float", x1,
             "float", y1,
             "float", x2,
             "float", y2
         )
+        DllCall("gdiplus\GdipDeletePen", "ptr", rayPen)
     }
-    DllCall("gdiplus\GdipDeletePen", "ptr", iconPen)
 
     barX := (metrics.contentX + barMarginLeft) * renderScale
     barY := (metrics.contentY + barMarginTop) * renderScale
@@ -269,7 +308,7 @@ DrawBrightnessPopup(level, metrics) {
     scaledBarRadius := barRadius * renderScale
     scaledFillRadius := barFillRadius * renderScale
 
-    barBackgroundArgb := 0xFF000000 | HexToInt(theme.barBg)
+    barBackgroundArgb := BuildPopupArgb(theme.barBg, 255, opacityScale)
     barBackgroundBrush := 0
     DllCall("gdiplus\GdipCreateSolidFill", "uint", barBackgroundArgb, "ptr*", &barBackgroundBrush)
     barBackgroundPath := 0
@@ -285,7 +324,7 @@ DrawBrightnessPopup(level, metrics) {
             fillWidth := 2 * renderScale
         }
 
-        fillArgb := 0xFF000000 | HexToInt(barFillColor)
+        fillArgb := BuildPopupArgb(barFillColor, 255, opacityScale)
         fillBrush := 0
         DllCall("gdiplus\GdipCreateSolidFill", "uint", fillArgb, "ptr*", &fillBrush)
         fillPath := 0
@@ -366,6 +405,67 @@ DrawBrightnessPopup(level, metrics) {
     DllCall("DeleteDC", "ptr", memDc)
     DllCall("DeleteObject", "ptr", hBitmap)
     DllCall("ReleaseDC", "ptr", 0, "ptr", screenDc)
+}
+
+BeginBrightnessPopupFadeOut(*) {
+    global BRIGHTNESS_POPUP_FADE_INTERVAL_MS
+    global BrightnessPopupFadeTimer
+    global BrightnessPopupFadeDirection
+    global BrightnessPopupOpacity
+
+    if (BrightnessPopupOpacity <= 0.0) {
+        CloseBrightnessPopup()
+        return
+    }
+
+    BrightnessPopupFadeDirection := -1
+    SetTimer(BrightnessPopupFadeTimer, 0)
+    SetTimer(BrightnessPopupFadeTimer, BRIGHTNESS_POPUP_FADE_INTERVAL_MS)
+}
+
+AdvanceBrightnessPopupFade(*) {
+    global BRIGHTNESS_POPUP_FADE_IN_STEP
+    global BRIGHTNESS_POPUP_FADE_OUT_STEP
+    global BrightnessPopupFadeTimer
+    global BrightnessPopupFadeDirection
+    global BrightnessPopupLevel
+    global BrightnessPopupOpacity
+    global BrightnessPopupHwnd
+
+    if !BrightnessPopupHwnd {
+        BrightnessPopupFadeDirection := 0
+        BrightnessPopupOpacity := 0.0
+        SetTimer(BrightnessPopupFadeTimer, 0)
+        return
+    }
+
+    if (BrightnessPopupFadeDirection = 0) {
+        SetTimer(BrightnessPopupFadeTimer, 0)
+        return
+    }
+
+    step := BrightnessPopupFadeDirection > 0 ? BRIGHTNESS_POPUP_FADE_IN_STEP : BRIGHTNESS_POPUP_FADE_OUT_STEP
+    BrightnessPopupOpacity += BrightnessPopupFadeDirection * step
+
+    if (BrightnessPopupFadeDirection > 0 && BrightnessPopupOpacity >= 1.0) {
+        BrightnessPopupOpacity := 1.0
+        BrightnessPopupFadeDirection := 0
+    } else if (BrightnessPopupFadeDirection < 0 && BrightnessPopupOpacity <= 0.0) {
+        BrightnessPopupOpacity := 0.0
+        BrightnessPopupFadeDirection := 0
+    }
+
+    if (BrightnessPopupOpacity > 0.0) {
+        DrawBrightnessPopup(BrightnessPopupLevel, GetBrightnessPopupMetrics(), BrightnessPopupOpacity)
+    }
+
+    if (BrightnessPopupFadeDirection = 0) {
+        SetTimer(BrightnessPopupFadeTimer, 0)
+
+        if (BrightnessPopupOpacity <= 0.0) {
+            CloseBrightnessPopup()
+        }
+    }
 }
 
 GetBrightnessPopupTheme() {
@@ -467,7 +567,7 @@ GetBrightnessRayStrength(level, rayRank, totalRays) {
     return Min(1.0, Max(0.0, fillUnits - (rayRank - 1)))
 }
 
-DrawBrightnessPopupShadow(graphics, x, y, width, height, radius, shadowSize, shadowOffsetY, theme) {
+DrawBrightnessPopupShadow(graphics, x, y, width, height, radius, shadowSize, shadowOffsetY, theme, opacityScale) {
     if (shadowSize <= 0) {
         return
     }
@@ -482,7 +582,8 @@ DrawBrightnessPopupShadow(graphics, x, y, width, height, radius, shadowSize, sha
         shadowSize,
         shadowOffsetY,
         theme.shadowOuterAlpha,
-        theme.shadowColor
+        theme.shadowColor,
+        opacityScale
     )
     DrawBrightnessShadowLayer(
         graphics,
@@ -494,12 +595,13 @@ DrawBrightnessPopupShadow(graphics, x, y, width, height, radius, shadowSize, sha
         Max(1.0, shadowSize * 0.55),
         shadowOffsetY * 0.5,
         theme.shadowInnerAlpha,
-        theme.shadowColor
+        theme.shadowColor,
+        opacityScale
     )
 }
 
-DrawBrightnessShadowLayer(graphics, x, y, width, height, radius, expand, offsetY, alpha, colorHex) {
-    shadowArgb := (alpha << 24) | HexToInt(colorHex)
+DrawBrightnessShadowLayer(graphics, x, y, width, height, radius, expand, offsetY, alpha, colorHex, opacityScale) {
+    shadowArgb := BuildPopupArgb(colorHex, alpha, opacityScale)
     shadowBrush := 0
     DllCall("gdiplus\GdipCreateSolidFill", "uint", shadowArgb, "ptr*", &shadowBrush)
     shadowPath := 0
@@ -542,6 +644,15 @@ GetTaskbarTop() {
 
 CloseBrightnessPopup(*) {
     global BrightnessPopupHwnd
+    global BrightnessPopupFadeTimer
+    global BrightnessPopupHideTimer
+    global BrightnessPopupFadeDirection
+    global BrightnessPopupOpacity
+
+    SetTimer(BrightnessPopupFadeTimer, 0)
+    SetTimer(BrightnessPopupHideTimer, 0)
+    BrightnessPopupFadeDirection := 0
+    BrightnessPopupOpacity := 0.0
 
     if BrightnessPopupHwnd {
         DllCall("DestroyWindow", "ptr", BrightnessPopupHwnd)
@@ -582,4 +693,9 @@ AddRoundedRectPath(pathHandle, x, y, width, height, radius) {
 HexToInt(hexColor) {
     hexColor := StrReplace(hexColor, "#", "")
     return Integer("0x" hexColor)
+}
+
+BuildPopupArgb(colorHex, alpha := 255, opacityScale := 1.0) {
+    scaledAlpha := Round(Max(0, Min(255, alpha * opacityScale)))
+    return (scaledAlpha << 24) | HexToInt(colorHex)
 }
