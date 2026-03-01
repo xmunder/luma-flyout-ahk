@@ -1,0 +1,1 @@
+#Include "main.ahk"
