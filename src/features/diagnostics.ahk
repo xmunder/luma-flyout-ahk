@@ -1,4 +1,8 @@
 ; Quick keyboard diagnostics while testing OEM keys.
-^F11::{
+if (DIAGNOSTICS_HOTKEY_KEY_HISTORY != "") {
+    Hotkey(DIAGNOSTICS_HOTKEY_KEY_HISTORY, HandleDiagnosticsKeyHistoryHotkey)
+}
+
+HandleDiagnosticsKeyHistoryHotkey(*) {
     KeyHistory
 }

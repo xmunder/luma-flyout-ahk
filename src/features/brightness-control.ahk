@@ -1,10 +1,18 @@
 ; Brightness hotkeys and WMI control.
-^F4::{
+if (BRIGHTNESS_HOTKEY_UP != "") {
+    Hotkey(BRIGHTNESS_HOTKEY_UP, HandleBrightnessUpHotkey)
+}
+
+if (BRIGHTNESS_HOTKEY_DOWN != "") {
+    Hotkey(BRIGHTNESS_HOTKEY_DOWN, HandleBrightnessDownHotkey)
+}
+
+HandleBrightnessUpHotkey(*) {
     global BRIGHTNESS_STEP
     AdjustBrightness(BRIGHTNESS_STEP)
 }
 
-^F5::{
+HandleBrightnessDownHotkey(*) {
     global BRIGHTNESS_STEP
     AdjustBrightness(-BRIGHTNESS_STEP)
 }

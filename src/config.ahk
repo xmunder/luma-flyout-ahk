@@ -1,9 +1,28 @@
 ; Shared settings used across the script.
+; Audio feature hotkeys.
+global AUDIO_HOTKEY_MUTE := "^F1"
+global AUDIO_HOTKEY_VOLUME_UP := "^F2"
+global AUDIO_HOTKEY_VOLUME_DOWN := "^F3"
+
+; Brightness feature hotkeys.
+global BRIGHTNESS_HOTKEY_UP := "^F4"
+global BRIGHTNESS_HOTKEY_DOWN := "^F5"
+
+; Navigation feature hotkeys.
+global NAVIGATION_HOTKEY_SELECT_END := "+!Right"
+global NAVIGATION_HOTKEY_SELECT_HOME := "+!Left"
+global NAVIGATION_HOTKEY_END := "!Right"
+global NAVIGATION_HOTKEY_HOME := "!Left"
+global NAVIGATION_HOTKEY_PRINT_SCREEN := "F12"
+
+; Diagnostics feature hotkeys.
+global DIAGNOSTICS_HOTKEY_KEY_HISTORY := "^F11"
+
 global BRIGHTNESS_STEP := 10
 global BRIGHTNESS_POPUP_WIDTH := 170
 global BRIGHTNESS_POPUP_HEIGHT := 50
 global BRIGHTNESS_POPUP_RADIUS := 8
-global BRIGHTNESS_POPUP_BAR_WIDTH := 110
+global BRIGHTNESS_POPUP_BAR_WIDTH := 120
 global BRIGHTNESS_POPUP_SHADOW_SIZE := 4
 global BRIGHTNESS_POPUP_SHADOW_OFFSET_Y := 2
 global BRIGHTNESS_POPUP_BAR_COLOR := "" ; Forces the same RGB hex color in all themes.
