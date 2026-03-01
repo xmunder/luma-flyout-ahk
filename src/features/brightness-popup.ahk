@@ -173,18 +173,23 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     barWidth := BRIGHTNESS_POPUP_BAR_WIDTH
     barHeight := 4
     barRadius := 2
-    barMarginTop := 19
-    barMarginLeft := 42
     barFillRadius := 2
 
     iconMarginLeft := 11
-    iconMarginTop := 13
-    sunRingRadius := 2.6
+    sunRingRadius := 3.0
     sunRingThickness := 1.15
-    sunRayLength := 2.4
-    sunRayGap := 1.6
+    sunRayLength := 2.8
+    sunRayGap := 1.8
     sunRayThickness := 1.1
     sunRayCount := 8
+    iconOuterRadius := sunRingRadius + sunRayGap + sunRayLength + 0.4
+    iconSizeBase := Ceil(iconOuterRadius * 2)
+    iconMarginTop := Max(0, Round((popupHeight - iconSizeBase) / 2))
+    barMarginTop := Round((popupHeight - barHeight) / 2)
+    barMarginLeft := Max(
+        Round((popupWidth - barWidth) / 2),
+        iconMarginLeft + iconSizeBase + 6
+    )
     barFillColor := ResolveBrightnessPopupBarColor(theme)
     borderColor := ResolveBrightnessPopupBorderColor(theme)
 
@@ -259,7 +264,7 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     DllCall("gdiplus\GdipDeleteBrush", "ptr", backgroundBrush)
     DllCall("gdiplus\GdipDeletePath", "ptr", backgroundPath)
 
-    iconSize := (sunRingRadius + sunRayGap + sunRayLength) * 2 * renderScale
+    iconSize := iconSizeBase * renderScale
     iconX := (metrics.contentX + iconMarginLeft) * renderScale
     iconY := (metrics.contentY + iconMarginTop) * renderScale
     ringRadius := sunRingRadius * renderScale
@@ -284,8 +289,8 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     )
     DllCall("gdiplus\GdipDeletePen", "ptr", ringPen)
 
-    globalRayLengthScale := 0.25 + (0.75 * normalizedLevel)
-    rotationOffset := (1.0 - normalizedLevel) * (3.14159265358979 / sunRayCount)
+    globalRayLengthScale := 0.28 + (0.72 * normalizedLevel)
+    rotationOffset := (1.0 - normalizedLevel) * (3.14159265358979 / 2.8)
     pi := 3.14159265358979
     Loop sunRayCount {
         rayRank := GetBrightnessRayRank(A_Index)
@@ -295,8 +300,9 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
         }
 
         angle := ((A_Index - 1) * (2 * pi / sunRayCount)) + rotationOffset
-        startDistance := ringRadius + rayGap
-        currentRayLength := Max(0.7 * renderScale, rayLength * globalRayLengthScale * (0.2 + (0.8 * rayStrength)))
+        currentRayLength := Max(0.9 * renderScale, rayLength * globalRayLengthScale * (0.22 + (0.78 * rayStrength)))
+        halfRayLength := currentRayLength / 2.0
+        orbitDistance := ringRadius + rayGap + halfRayLength + (0.25 * renderScale)
         currentRayThickness := Max(0.85 * renderScale, rayThickness * (0.65 + (0.35 * rayStrength)))
         rayArgb := BuildPopupArgb(theme.icon, Round(255 * (0.2 + (0.8 * rayStrength))), opacityScale)
         rayPen := 0
@@ -304,11 +310,14 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
         DllCall("gdiplus\GdipSetPenStartCap", "ptr", rayPen, "int", 2)
         DllCall("gdiplus\GdipSetPenEndCap", "ptr", rayPen, "int", 2)
 
-        endDistance := startDistance + currentRayLength
-        x1 := centerX + Cos(angle) * startDistance
-        y1 := centerY + Sin(angle) * startDistance
-        x2 := centerX + Cos(angle) * endDistance
-        y2 := centerY + Sin(angle) * endDistance
+        tiltSign := Mod(A_Index, 2) = 0 ? -1 : 1
+        rayDirection := angle + (tiltSign * 0.34) + ((1.0 - normalizedLevel) * 0.12)
+        rayCenterX := centerX + Cos(angle) * orbitDistance
+        rayCenterY := centerY + Sin(angle) * orbitDistance
+        x1 := rayCenterX - (Cos(rayDirection) * halfRayLength)
+        y1 := rayCenterY - (Sin(rayDirection) * halfRayLength)
+        x2 := rayCenterX + (Cos(rayDirection) * halfRayLength)
+        y2 := rayCenterY + (Sin(rayDirection) * halfRayLength)
 
         DllCall(
             "gdiplus\GdipDrawLine",
