@@ -1,4 +1,4 @@
-# Atajos Personalizados con AutoHotkey v2
+# LumaFlyout AHK
 
 Script modular en AutoHotkey v2 para controlar volumen, brillo, navegación y utilidades rápidas desde atajos de teclado configurables.
 
