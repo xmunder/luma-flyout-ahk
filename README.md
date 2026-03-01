@@ -4,9 +4,12 @@ Script modular en AutoHotkey v2 para controlar volumen, brillo, navegación y ut
 
 ## Demo
 
-![Demo principal del OSD de brillo](<./Grabación de pantalla 2026-02-28 230053.gif>)
+<div style="display: flex; gap: 10px;">
 
 ![Demo adicional del OSD de brillo](<./Grabación de pantalla 2026-02-28 232138.gif>)
+
+![Demo principal del OSD de brillo](<./Grabación de pantalla 2026-02-28 230053.gif>)
+</div>
 
 ## Características
 
@@ -28,13 +31,6 @@ Script modular en AutoHotkey v2 para controlar volumen, brillo, navegación y ut
   - Un panel interno o dispositivo que exponga control de brillo por WMI.
   - Si el equipo controla el brillo solo por BIOS/OEM, el cambio de brillo puede no funcionar.
 
-## Estructura
-
-- `main.ahk`: punto de entrada principal.
-- `shortcuts_v2.ahk`: wrapper de compatibilidad que carga `main.ahk`.
-- `src/config.ahk`: hotkeys por defecto y configuración general.
-- `src/features/`: lógica separada por funcionalidad.
-- `src/shared/`: utilidades compartidas.
 
 ## Instalación
 

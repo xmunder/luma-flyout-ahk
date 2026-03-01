@@ -182,6 +182,7 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     sunRayGap := 1.8
     sunRayThickness := 1.1
     sunRayCount := 8
+    barBackgroundColor := ResolveBrightnessPopupBarBackgroundColor(theme)
     iconOuterRadius := sunRingRadius + sunRayGap + sunRayLength + 0.4
     iconSizeBase := Ceil(iconOuterRadius * 2)
     iconMarginTop := Max(0, Round((popupHeight - iconSizeBase) / 2))
@@ -334,7 +335,7 @@ DrawBrightnessPopup(level, metrics, opacityScale := 1.0) {
     scaledBarRadius := barRadius * renderScale
     scaledFillRadius := barFillRadius * renderScale
 
-    barBackgroundArgb := BuildPopupArgb(theme.barBg, 255, opacityScale)
+    barBackgroundArgb := BuildPopupArgb(barBackgroundColor, 255, opacityScale)
     barBackgroundBrush := 0
     DllCall("gdiplus\GdipCreateSolidFill", "uint", barBackgroundArgb, "ptr*", &barBackgroundBrush)
     barBackgroundPath := 0
@@ -555,6 +556,26 @@ ResolveBrightnessPopupBarColor(theme) {
     }
 
     return theme.barFill
+}
+
+ResolveBrightnessPopupBarBackgroundColor(theme) {
+    global BRIGHTNESS_POPUP_BAR_BG_COLOR
+    global BRIGHTNESS_POPUP_BAR_BG_COLOR_LIGHT
+    global BRIGHTNESS_POPUP_BAR_BG_COLOR_DARK
+
+    if (BRIGHTNESS_POPUP_BAR_BG_COLOR != "") {
+        return BRIGHTNESS_POPUP_BAR_BG_COLOR
+    }
+
+    if (theme.isLight && BRIGHTNESS_POPUP_BAR_BG_COLOR_LIGHT != "") {
+        return BRIGHTNESS_POPUP_BAR_BG_COLOR_LIGHT
+    }
+
+    if (!theme.isLight && BRIGHTNESS_POPUP_BAR_BG_COLOR_DARK != "") {
+        return BRIGHTNESS_POPUP_BAR_BG_COLOR_DARK
+    }
+
+    return theme.barBg
 }
 
 ResolveBrightnessPopupBorderColor(theme) {
